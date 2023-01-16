@@ -20,6 +20,15 @@ On the roadmap:
 
 ### Reading a packet from file
 
+#### Using an example file
+
+```
+$ cargo run --bin cli -- read examples/question_packet
+$ ...
+```
+
+#### Generating your own DNS packet
+
 First, listen on a port using netcat:
 
 ```
