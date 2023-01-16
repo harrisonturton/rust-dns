@@ -44,7 +44,7 @@ async fn run_parse(filepath: &str) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-/// Run a simpel DNS server that prints parsed DNS UDP packets.
+/// Run a simple DNS server that prints parsed DNS UDP packets.
 async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
     let sock = UdpSocket::bind(addr).await?;
     println!("Listening on {}", addr);
@@ -53,6 +53,6 @@ async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
     loop {
         let (_, origin) = sock.recv_from(&mut buf).await?;
         let packet = core::parse(&buf);
-        println!("Received packet from {}:/n{:#?}", origin, packet);
+        println!("Received packet from {}:\n{:#?}", origin, packet);
     }
 }
