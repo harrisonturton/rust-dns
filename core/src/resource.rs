@@ -1,6 +1,6 @@
 use crate::{
     messages::{Class, RecordType},
-    take_bits_u8, Binary,
+    utils::{take_bits_u8, Binary},
 };
 use nom::{bits::bits, IResult};
 

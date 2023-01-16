@@ -1,4 +1,4 @@
-use crate::{bool, take_bits_u16, take_bits_u8, take_bytes, Binary};
+use crate::utils::{bool, take_bits_u16, take_bits_u8, take_bytes, Binary};
 use nom::IResult;
 
 #[derive(Debug)]

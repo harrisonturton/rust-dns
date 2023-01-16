@@ -1,0 +1,12 @@
+[package]
+name = "cli"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+# Local
+core = { path = "../core" }
+
+# Third-party
+tokio = { version = "1.24.1", features = [ "full" ] }
+clap = { version = "4.0.27", features = [ "derive" ] }
