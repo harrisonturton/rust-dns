@@ -13,6 +13,13 @@ pub struct DnsPacket {
     pub resource_entries: Vec<Record>,
 }
 
+pub fn serialize_dns_packet(packet: &DnsPacket) -> Vec<u8> {
+    let mut bytes = vec![];
+    let mut header = header::serialize_header(&packet.header);
+    bytes.append(&mut header);
+    bytes
+}
+
 pub fn parse_dns_packet(packet: &[u8]) -> Result<DnsPacket, Box<dyn error::Error>> {
     let mut packet = ByteBuffer::from(packet);
     let header = header::parse_header(&mut packet)?;

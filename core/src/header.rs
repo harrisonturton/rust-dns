@@ -1,9 +1,6 @@
 use super::buffer::ByteBuffer;
 use anyhow::{Context, Result};
-use bitvec::{
-    bits, bitvec, field::BitField, macros::internal::funty::Fundamental, prelude::Msb0,
-    vec::BitVec, view::AsBits,
-};
+use bitvec::{field::BitField, macros::internal::funty::Fundamental, prelude::Msb0, view::AsBits};
 use std::error;
 
 #[derive(Debug)]
@@ -25,9 +22,10 @@ pub struct Header {
 
 pub fn serialize_header(header: &Header) -> Vec<u8> {
     let mut res: Vec<u8> = vec![0; 12];
-    res[0] = (header.id << 8) as u8;
-    res[1] = header.id as u8;
-    res[2] = header.query.as_u8() << 7;
+    let id_bytes = header.id.to_be_bytes();
+    res[0] = id_bytes[0];
+    res[1] = id_bytes[1];
+    res[2] = (!header.query).as_u8() << 7;
     res[2] = res[2] | header.opcode << 4;
     res[2] = res[2] | header.authoritative_answer.as_u8() << 2;
     res[2] = res[2] | header.truncation.as_u8() << 1;

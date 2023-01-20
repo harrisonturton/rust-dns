@@ -52,8 +52,32 @@ async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
 
     let mut buf = [0; 512];
     loop {
-        let (_, origin) = sock.recv_from(&mut buf).await?;
+        let (_, addr) = sock.recv_from(&mut buf).await?;
         let packet = core::parse_dns_packet(&buf)?;
-        println!("Received packet from {}:\n{:#?}", origin, packet);
+        println!("Received packet from {}:\n{:#?}", addr, packet);
+        let response_packet = core::packet::DnsPacket {
+            header: core::header::Header {
+                id: packet.header.id,
+                query: false,
+                opcode: 0,
+                authoritative_answer: true,
+                truncation: false,
+                recursion_desired: false,
+                recursion_available: false,
+                reserved: 0,
+                rcode: 0,
+                questions: 0,
+                answers: 1,
+                authoritative_entries: 0,
+                resource_entries: 0,
+            },
+            questions: vec![],
+            answers: vec![],
+            authoritative_entries: vec![],
+            resource_entries: vec![],
+        };
+        let response_packet = core::serialize_dns_packet(&response_packet);
+        let len = sock.send_to(&response_packet, addr).await?;
+        println!("{:?} bytes sent", len);
     }
 }
