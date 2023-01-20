@@ -1,6 +1,9 @@
 use super::buffer::ByteBuffer;
 use anyhow::{Context, Result};
-use bitvec::{field::BitField, macros::internal::funty::Fundamental, prelude::Msb0, view::AsBits};
+use bitvec::{
+    bits, bitvec, field::BitField, macros::internal::funty::Fundamental, prelude::Msb0,
+    vec::BitVec, view::AsBits,
+};
 use std::error;
 
 #[derive(Debug)]
@@ -18,6 +21,29 @@ pub struct Header {
     pub answers: u16,
     pub authoritative_entries: u16,
     pub resource_entries: u16,
+}
+
+pub fn serialize_header(header: &Header) -> Vec<u8> {
+    let mut res: Vec<u8> = vec![0; 12];
+    res[0] = (header.id << 8) as u8;
+    res[1] = header.id as u8;
+    res[2] = header.query.as_u8() << 7;
+    res[2] = res[2] | header.opcode << 4;
+    res[2] = res[2] | header.authoritative_answer.as_u8() << 2;
+    res[2] = res[2] | header.truncation.as_u8() << 1;
+    res[2] = res[2] | header.recursion_desired.as_u8();
+    res[3] = header.recursion_available.as_u8() << 7;
+    res[3] = res[3] | header.reserved.as_u8() << 4;
+    res[3] = res[3] | header.rcode.as_u8();
+    res[4] = (header.questions << 8) as u8;
+    res[5] = header.questions as u8;
+    res[6] = (header.answers << 8) as u8;
+    res[7] = header.answers as u8;
+    res[8] = (header.authoritative_entries << 8) as u8;
+    res[9] = header.authoritative_entries as u8;
+    res[10] = (header.resource_entries << 8) as u8;
+    res[11] = header.resource_entries as u8;
+    res
 }
 
 pub fn parse_header(packet: &mut ByteBuffer) -> Result<Header, Box<dyn error::Error>> {
@@ -85,6 +111,39 @@ mod tests {
     const QUERY_ANSWERS: u16 = 0;
     const QUERY_AUTHORITATIVE_ENTRIES: u16 = 0;
     const QUERY_RESOURCE_ENTRIES: u16 = 0;
+
+    #[test]
+    fn test_serialize_header_returns_expected_value() {
+        let header = Header {
+            id: 100,
+            query: false,
+            opcode: 0b111,
+            authoritative_answer: true,
+            truncation: false,
+            recursion_desired: true,
+            recursion_available: false,
+            reserved: 0b000,
+            rcode: 0b1111,
+            questions: 3,
+            answers: 4,
+            authoritative_entries: 5,
+            resource_entries: 6,
+        };
+        let mut expected = vec![0; 12];
+        expected[0] = (100 << 8) as u8;
+        expected[1] = 100 as u8;
+        expected[2] = 0b01110101;
+        expected[3] = 0b0001111;
+        expected[4] = (3 << 8) as u8;
+        expected[5] = 3 as u8;
+        expected[6] = (4 << 8) as u8;
+        expected[7] = 4 as u8;
+        expected[8] = (5 << 8) as u8;
+        expected[9] = 5 as u8;
+        expected[10] = (6 << 8) as u8;
+        expected[11] = 6 as u8;
+        assert_eq!(serialize_header(&header), expected);
+    }
 
     #[test]
     fn test_parse_header_returns_expected_id() -> Result<(), Box<dyn error::Error>> {
