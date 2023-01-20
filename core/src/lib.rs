@@ -1,10 +1,9 @@
 //! This package provides methods to serialize and deserialize UDP DNS packets.
 
-#![feature(type_alias_impl_trait)]
+mod buffer;
+mod header;
+mod packet;
+mod question;
+mod record;
 
-pub mod header;
-pub mod messages;
-pub mod parser;
-pub mod question;
-pub mod resource;
-pub mod utils;
+pub use packet::parse_dns_packet;

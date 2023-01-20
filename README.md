@@ -53,7 +53,7 @@ $ ...
 This will receive UDP packets, parse and print them, and then echo them back to the caller.
 
 ```
-$ cargo run --bin cli -- launch --addr 127.0.0.1:3000
+$ cargo run --bin cli -- serve 127.0.0.1:3000
 $ dig +retry=0 -p 3000 @127.0.0.1 +noedns example.com
 ```
 

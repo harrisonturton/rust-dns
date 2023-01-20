@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 /// not a TCP. This means it cannot handle DNS packets that are too long.
 async fn run_parse(filepath: &str) -> Result<(), Box<dyn error::Error>> {
     let file = fs::read(filepath)?;
-    let packet = core::parser::DnsPacket::deserialize(&file)?;
+    let packet = core::parse_dns_packet(&file)?;
     println!("Got packet: {:#?}", packet);
     Ok(())
 }
@@ -53,7 +53,7 @@ async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
     let mut buf = [0; 512];
     loop {
         let (_, origin) = sock.recv_from(&mut buf).await?;
-        let packet = core::parser::DnsPacket::deserialize(&buf)?;
+        let packet = core::parse_dns_packet(&buf)?;
         println!("Received packet from {}:\n{:#?}", origin, packet);
     }
 }

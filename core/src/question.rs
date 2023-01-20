@@ -1,57 +1,41 @@
-use nom::{
-    bytes::{self, complete::take},
-    sequence::tuple,
-    IResult,
-};
+use anyhow::Context;
 
-use crate::messages::{Class, RecordType};
+use super::buffer::ByteBuffer;
+use std::error;
 
 #[derive(Debug)]
-pub struct QuestionRecord {
-    pub qname: String,
-    pub qtype: RecordType,
-    pub qclass: Class,
+pub struct Question {
+    pub name: String,
+    pub typ: u16,
+    pub class: u16,
 }
 
-pub fn parse_question<'a>(message: &[u8]) -> IResult<&[u8], QuestionRecord> {
-    let mut parser = tuple((qname, take(2usize), take(2usize)));
-    let (rest, (qname, qtype, qclass)) = parser(message)?;
-
-    let qtype = u16::from_be_bytes(qtype.try_into().unwrap());
-    let qclass = u16::from_be_bytes(qclass.try_into().unwrap());
-
-    let question_record = QuestionRecord {
-        qname,
-        qtype: qtype.into(),
-        qclass: qclass.into(),
-    };
-
-    Ok((rest, question_record))
+pub fn parse_questions(
+    packet: &mut ByteBuffer,
+    count: usize,
+) -> Result<Vec<Question>, Box<dyn error::Error>> {
+    let mut records = vec![];
+    for _ in 0..count {
+        let record = parse_single_question(packet)?;
+        records.push(record);
+    }
+    Ok(records)
 }
 
-fn qname(message: &[u8]) -> IResult<&[u8], String> {
-    let mut labels = vec![];
-    let mut rest = message;
+pub fn parse_single_question(packet: &mut ByteBuffer) -> Result<Question, Box<dyn error::Error>> {
+    let mut name_parts = vec![];
     loop {
-        let (label_rest, length) = take_byte(rest)?;
-        let length = u8::from_be_bytes(length.try_into().unwrap());
-        if length == 0 {
-            rest = label_rest;
+        let label_len = packet.read().context("could not read label length")?;
+        if label_len == 0 {
+            // Reached end of the label sequence
             break;
         }
-
-        let (label_rest, label) = take_bytes(label_rest, length as usize)?;
-        labels.push(String::from_utf8_lossy(label));
-        rest = label_rest;
+        let label_bytes = packet.read_range(label_len as usize)?;
+        let label = String::from_utf8_lossy(label_bytes);
+        name_parts.push(label);
     }
-    let name = labels.join(".");
-    Ok((rest, name))
-}
-
-fn take_byte(input: &[u8]) -> IResult<&[u8], &[u8]> {
-    bytes::complete::take(1usize)(input)
-}
-
-fn take_bytes(input: &[u8], i: usize) -> IResult<&[u8], &[u8]> {
-    bytes::complete::take(i)(input)
+    let name = name_parts.join(".");
+    let typ = packet.read_u16()?;
+    let class = packet.read_u16()?;
+    Ok(Question { name, typ, class })
 }
