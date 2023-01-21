@@ -13,11 +13,19 @@ pub struct DnsPacket {
     pub resource_entries: Vec<Record>,
 }
 
-pub fn serialize_dns_packet(packet: &DnsPacket) -> Vec<u8> {
+pub fn serialize_dns_packet(packet: &DnsPacket) -> Result<Vec<u8>, Box<dyn error::Error>> {
     let mut bytes = vec![];
     let mut header = header::serialize_header(&packet.header);
     bytes.append(&mut header);
-    bytes
+    let mut questions = question::serialize_questions(&packet.questions)?;
+    bytes.append(&mut questions);
+    let mut answers = record::serialize_records(&packet.answers)?;
+    bytes.append(&mut answers);
+    let mut authoritative_entries = record::serialize_records(&packet.authoritative_entries)?;
+    bytes.append(&mut authoritative_entries);
+    let mut resource_entries = record::serialize_records(&packet.resource_entries)?;
+    bytes.append(&mut resource_entries);
+    Ok(bytes)
 }
 
 pub fn parse_dns_packet(packet: &[u8]) -> Result<DnsPacket, Box<dyn error::Error>> {

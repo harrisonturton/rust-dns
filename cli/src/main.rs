@@ -17,6 +17,12 @@ enum Command {
         /// Path to the file
         filepath: String,
     },
+    /// Write a DNS packet to a file
+    #[command(name = "write")]
+    Write {
+        /// Path to the file
+        filepath: String,
+    },
     /// Launch a stub DNS server
     #[command(name = "serve")]
     Serve {
@@ -28,9 +34,9 @@ enum Command {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
     let args = Args::parse();
-    println!("Running");
     match &args.command {
         Command::Parse { filepath } => run_parse(filepath).await?,
+        Command::Write { filepath } => run_write(filepath).await?,
         Command::Serve { addr } => run_serve(addr).await?,
     };
     Ok(())
@@ -45,6 +51,44 @@ async fn run_parse(filepath: &str) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
+async fn run_write(filepath: &str) -> Result<(), Box<dyn error::Error>> {
+    let packet = core::packet::DnsPacket {
+        header: core::header::Header {
+            id: 9398,
+            query: false,
+            opcode: core::header::Opcode::Query,
+            authoritative_answer: true,
+            truncation: true,
+            recursion_desired: false,
+            recursion_available: false,
+            reserved: 0,
+            rcode: core::header::ResponseCode::Success,
+            questions: 1,
+            answers: 1,
+            authoritative_entries: 0,
+            resource_entries: 0,
+        },
+        questions: vec![core::question::Question {
+            name: "example.com".to_string(),
+            typ: 1,
+            class: 1,
+        }],
+        answers: vec![core::record::Record {
+            name: "example.com".to_string(),
+            record_type: core::record::RecordType::A,
+            class: core::record::Class::In,
+            ttl: 215,
+            len: 4,
+            data: core::record::Data::Addr([127, 0, 0, 1]),
+        }],
+        authoritative_entries: vec![],
+        resource_entries: vec![],
+    };
+    let bytes = core::packet::serialize_dns_packet(&packet)?;
+    fs::write(filepath, bytes)?;
+    Ok(())
+}
+
 /// Run a simple DNS server that prints parsed DNS UDP packets.
 async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
     let sock = UdpSocket::bind(addr).await?;
@@ -54,30 +98,43 @@ async fn run_serve(addr: &str) -> Result<(), Box<dyn error::Error>> {
     loop {
         let (_, addr) = sock.recv_from(&mut buf).await?;
         let packet = core::parse_dns_packet(&buf)?;
-        println!("Received packet from {}:\n{:#?}", addr, packet);
+        println!("--------------------------------------------------");
+        println!("RECEIVED PACKET FROM {}", addr);
+        println!("--------------------------------------------------");
+        println!("{:#?}", packet);
         let response_packet = core::packet::DnsPacket {
             header: core::header::Header {
                 id: packet.header.id,
                 query: false,
-                opcode: 0,
+                opcode: core::header::Opcode::Query,
                 authoritative_answer: true,
                 truncation: false,
                 recursion_desired: false,
                 recursion_available: false,
-                reserved: 0,
-                rcode: 0,
-                questions: 0,
+                reserved: packet.header.reserved,
+                rcode: core::header::ResponseCode::Success,
+                questions: 1,
                 answers: 1,
                 authoritative_entries: 0,
                 resource_entries: 0,
             },
-            questions: vec![],
-            answers: vec![],
+            questions: packet.questions,
+            answers: vec![core::record::Record {
+                name: "example.com".to_string(),
+                record_type: core::record::RecordType::A,
+                class: core::record::Class::In,
+                ttl: 100,
+                len: 4,
+                data: core::record::Data::Addr([127, 0, 0, 1]),
+            }],
             authoritative_entries: vec![],
             resource_entries: vec![],
         };
-        let response_packet = core::serialize_dns_packet(&response_packet);
-        let len = sock.send_to(&response_packet, addr).await?;
-        println!("{:?} bytes sent", len);
+        println!("--------------------------------------------------");
+        println!("RESPONDING WITH PACKET:");
+        println!("--------------------------------------------------");
+        println!("{:#?}", response_packet);
+        let response_packet = core::serialize_dns_packet(&response_packet)?;
+        let _ = sock.send_to(&response_packet, addr).await?;
     }
 }

@@ -1,5 +1,3 @@
-use anyhow::Context;
-
 use super::buffer::ByteBuffer;
 use std::error;
 
@@ -22,19 +20,28 @@ pub fn parse_questions(
     Ok(records)
 }
 
-pub fn parse_single_question(packet: &mut ByteBuffer) -> Result<Question, Box<dyn error::Error>> {
-    let mut name_parts = vec![];
-    loop {
-        let label_len = packet.read().context("could not read label length")?;
-        if label_len == 0 {
-            // Reached end of the label sequence
-            break;
-        }
-        let label_bytes = packet.read_range(label_len as usize)?;
-        let label = String::from_utf8_lossy(label_bytes);
-        name_parts.push(label);
+pub fn serialize_questions(questions: &[Question]) -> Result<Vec<u8>, Box<dyn error::Error>> {
+    let mut bytes = vec![];
+    for question in questions {
+        let question_bytes = serialize_single_question(&question)?;
+        bytes.extend(question_bytes);
     }
-    let name = name_parts.join(".");
+    Ok(bytes)
+}
+
+pub fn serialize_single_question(question: &Question) -> Result<Vec<u8>, Box<dyn error::Error>> {
+    let mut bytes = vec![];
+    let name = crate::record::serialize_name(&question.name)?;
+    bytes.extend(name);
+    let typ = question.typ.to_be_bytes();
+    bytes.extend(typ);
+    let class = question.typ.to_be_bytes();
+    bytes.extend(class);
+    Ok(bytes)
+}
+
+pub fn parse_single_question(packet: &mut ByteBuffer) -> Result<Question, Box<dyn error::Error>> {
+    let name = crate::record::parse_name(packet)?;
     let typ = packet.read_u16()?;
     let class = packet.read_u16()?;
     Ok(Question { name, typ, class })

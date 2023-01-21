@@ -3,17 +3,21 @@ use anyhow::{Context, Result};
 use bitvec::{field::BitField, macros::internal::funty::Fundamental, prelude::Msb0, view::AsBits};
 use std::error;
 
+// --------------------------------------------------
+// Header
+// --------------------------------------------------
+
 #[derive(Debug)]
 pub struct Header {
     pub id: u16,
     pub query: bool,
-    pub opcode: u8,
+    pub opcode: Opcode,
     pub authoritative_answer: bool,
     pub truncation: bool,
     pub recursion_desired: bool,
     pub recursion_available: bool,
     pub reserved: u8,
-    pub rcode: u8,
+    pub rcode: ResponseCode,
     pub questions: u16,
     pub answers: u16,
     pub authoritative_entries: u16,
@@ -26,13 +30,13 @@ pub fn serialize_header(header: &Header) -> Vec<u8> {
     res[0] = id_bytes[0];
     res[1] = id_bytes[1];
     res[2] = (!header.query).as_u8() << 7;
-    res[2] = res[2] | header.opcode << 4;
+    res[2] = res[2] | serialize_opcode(&header.opcode) << 4;
     res[2] = res[2] | header.authoritative_answer.as_u8() << 2;
     res[2] = res[2] | header.truncation.as_u8() << 1;
     res[2] = res[2] | header.recursion_desired.as_u8();
     res[3] = header.recursion_available.as_u8() << 7;
     res[3] = res[3] | header.reserved.as_u8() << 4;
-    res[3] = res[3] | header.rcode.as_u8();
+    res[3] = res[3] | serialize_response_code(&header.rcode);
     res[4] = (header.questions << 8) as u8;
     res[5] = header.questions as u8;
     res[6] = (header.answers << 8) as u8;
@@ -52,6 +56,7 @@ pub fn parse_header(packet: &mut ByteBuffer) -> Result<Header, Box<dyn error::Er
     let flags = flags.as_bits::<Msb0>().to_bitvec();
     let query = flags.get(0).context("query flag not found")?.as_bool();
     let opcode = flags.get(1..5).context("opcode not found")?.load::<u8>();
+    let opcode = parse_opcode(opcode);
     let authoritative_answer = flags
         .get(5)
         .context("authoritative_answer flag not found")?
@@ -70,6 +75,7 @@ pub fn parse_header(packet: &mut ByteBuffer) -> Result<Header, Box<dyn error::Er
         .context("reserved flags not found")?
         .load::<u8>();
     let rcode = flags.get(13..15).context("rcode not found")?.load::<u8>();
+    let rcode = parse_response_code(rcode);
     let questions = header.read_u16()?;
     let answers = header.read_u16()?;
     let authoritative_entries = header.read_u16()?;
@@ -89,6 +95,75 @@ pub fn parse_header(packet: &mut ByteBuffer) -> Result<Header, Box<dyn error::Er
         authoritative_entries,
         resource_entries,
     })
+}
+
+// --------------------------------------------------
+// Opcode
+// --------------------------------------------------
+
+#[derive(Debug)]
+pub enum Opcode {
+    Query,
+    InverseQuery,
+    Status,
+    Unknown(u8),
+}
+
+pub fn parse_opcode(value: u8) -> Opcode {
+    match value {
+        0 => Opcode::Query,
+        1 => Opcode::InverseQuery,
+        2 => Opcode::Status,
+        _ => Opcode::Unknown(value),
+    }
+}
+
+pub fn serialize_opcode(opcode: &Opcode) -> u8 {
+    match opcode {
+        Opcode::Query => 1,
+        Opcode::InverseQuery => 2,
+        Opcode::Status => 3,
+        Opcode::Unknown(value) => *value,
+    }
+}
+
+// --------------------------------------------------
+// Response Code
+// --------------------------------------------------
+
+#[derive(Debug)]
+pub enum ResponseCode {
+    Success,
+    FormatError,
+    ServerFailure,
+    NameError,
+    NotImplemented,
+    Refused,
+    Unknown(u8),
+}
+
+pub fn parse_response_code(value: u8) -> ResponseCode {
+    match value {
+        0 => ResponseCode::Success,
+        1 => ResponseCode::FormatError,
+        2 => ResponseCode::ServerFailure,
+        3 => ResponseCode::NameError,
+        4 => ResponseCode::NotImplemented,
+        5 => ResponseCode::Refused,
+        _ => ResponseCode::Unknown(value),
+    }
+}
+
+pub fn serialize_response_code(response_code: &ResponseCode) -> u8 {
+    match response_code {
+        ResponseCode::Success => 1,
+        ResponseCode::FormatError => 2,
+        ResponseCode::ServerFailure => 3,
+        ResponseCode::NameError => 4,
+        ResponseCode::NotImplemented => 5,
+        ResponseCode::Refused => 6,
+        ResponseCode::Unknown(value) => *value,
+    }
 }
 
 #[cfg(test)]
